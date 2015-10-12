@@ -1,0 +1,23 @@
+tr:nth-child(even) td:nth-child(odd), tr:nth-child(odd) td:nth-child(even) {
+	background-color: #88563F;
+}
+
+#chessboard {
+	font-size:25px;
+	text-align:center;
+	border : 3px solid black;
+    border-spacing: 0;
+}
+
+#chessboard tr {
+	height:40px;
+}
+
+#chessboard td {
+	width:40px;
+	border:1px solid black;
+}
+
+#container {
+	margin:100px;
+}
