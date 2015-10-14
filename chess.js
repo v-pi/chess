@@ -55,8 +55,6 @@ var renderBoard = function() {
 }
 
 // Checks if the cell is occupied
-// Returns the piece occupying if it is
-// Returns an empty structure if it is not
 var isOccupied = function(x, y, whitePieces, blackPieces) {
 	for (var ii = 0; ii < whitePieces.length; ii++) {
 		var piece = whitePieces[ii];
@@ -109,7 +107,7 @@ var addMove = function(x, y, isWhite, moves, whitePieces, blackPieces) {
 	return false;
 }
 
-var evaluateBoard = function(w, b) {
+var simpleEvaluateBoard = function(w, b) {
 	var advantageWhite = 0;
 	for (var ii = 0; ii < w.length; ii++) {
 		advantageWhite += w[ii].value;
@@ -118,6 +116,33 @@ var evaluateBoard = function(w, b) {
 		advantageWhite -= b[ii].value;
 	}
 	return advantageWhite;
+}
+
+var complexEvaluateBoard = function(isWhitePlaying, w, b) {
+	var advantage = 0;
+	if (isWhitePlaying) {
+		var pieces = w;
+		var enemyPieces = b;
+	} else {
+		var pieces = b;
+		var enemyPieces = w;
+	}
+	for (var ii = 0; ii < pieces.length; ii++) {
+		var moves = pieces[ii].getMoves(w, b);
+		for (var jj = 0; jj < moves.length; jj++) {
+			// movement freedom
+			advantage += 0.1;
+			// enemy pieces threatened
+			if (moves[jj].length > 2)
+				advantage += enemyPieces[moves[jj][2]].value;
+			// control of the center
+			if (moves[jj][0] === 3 && moves[jj][1] === 3) advantage += 0.5;
+			if (moves[jj][0] === 3 && moves[jj][1] === 3) advantage += 0.5;
+			if (moves[jj][0] === 3 && moves[jj][1] === 3) advantage += 0.5;
+			if (moves[jj][0] === 3 && moves[jj][1] === 3) advantage += 0.5;
+		}
+	}
+	return advantage;
 }
 
 var getDepth = function() {
@@ -165,27 +190,62 @@ var executeMove = function(piece, newX, newY) {
 }
 
 var think = function(isWhitePlaying) {
-	var chosenPieceIndex;
+	var chosenPiece;
 	var chosenMove;
 	var evaluation = isWhitePlaying ? -1000 : 1000;
 	var depth = getDepth();
 	var pieces = isWhitePlaying ? whitePieces : blackPieces;
+	var acceptableMoves = [];
 	for (var ii = 0; ii < pieces.length; ii++) {
 		var moves = pieces[ii].getMoves(whitePieces, blackPieces);
 		for (var jj = 0; jj < moves.length; jj++) {
 			var move = moves[jj];
 			var tempEval = 0;
 			if (isWhitePlaying) tempEval = thinkAsBlack(whitePieces, blackPieces, pieces[ii], move, depth);
-			else tempEval = thinkAsWhite(whitePieces, blackPieces, pieces[ii], move, depth);
-			console.log(pieces[ii]._symbol + ' at ' + pieces[ii].currentX + ', ' + pieces[ii].currentY + ' moving to ' + move[0] + ', ' + move[1] + ' has an evaluation of ' + tempEval);
+			else tempEval = -1 * thinkAsWhite(whitePieces, blackPieces, pieces[ii], move, depth);
+			console.log(pieces[ii]._symbol + ' at ' + pieces[ii].currentX + ', ' + pieces[ii].currentY + ' moving to ' + move[0] + ', ' + move[1] + ' has a simple evaluation of ' + tempEval);
 			if (tempEval > evaluation) {
+				acceptableMoves = [{piece : pieces[ii], move : move }];
 				evaluation = tempEval;
-				chosenMove = move;
-				chosenPieceIndex = ii;
+			} else if (tempEval == evaluation) {
+				acceptableMoves.push({piece : pieces[ii], move : move });
 			}
 		}
 	}
-	return { piece : pieces[chosenPieceIndex], move : chosenMove };
+	console.log('Acceptable moves : ' + acceptableMoves.length);
+	evaluation = isWhitePlaying ? -1000 : 1000;
+	for (var ii = 0; ii < acceptableMoves.length; ii++) {
+		var move = acceptableMoves[ii].move;
+		var piece = acceptableMoves[ii].piece;
+		
+		var whitePiecesCopy = whitePieces;
+		var blackPiecesCopy = blackPieces;
+		if (move.length > 2) { // a piece is taken
+			if (isWhitePlaying) {
+				blackPiecesCopy = blackPieces.slice();
+				blackPiecesCopy.splice(move[2], 1);
+			} else {
+				whitePiecesCopy = whitePieces.slice();
+				whitePiecesCopy.splice(move[2], 1);
+			}
+		}
+		var oldX = piece.currentX;
+		var oldY = piece.currentY;
+		piece.currentX = move[0];
+		piece.currentY = move[1];
+		
+		var tempEval = complexEvaluateBoard(isWhitePlaying, whitePieces, blackPieces);
+		console.log(piece._symbol + ' at ' + oldX + ', ' + oldY + ' moving to ' + move[0] + ', ' + move[1] + ' has a complex evaluation of ' + tempEval);
+		if (tempEval > evaluation) {
+			chosenMove = move;
+			chosenPiece = piece;
+			evaluation = tempEval;
+		}		
+		piece.currentX = oldX;
+		piece.currentY = oldY;
+	}
+	
+	return { piece : chosenPiece, move : chosenMove };
 }
 
 var thinkAsBlack = function(whitePieces, blackPieces, piece, move, depth) {
@@ -194,12 +254,12 @@ var thinkAsBlack = function(whitePieces, blackPieces, piece, move, depth) {
 		blackPiecesCopy = blackPieces.slice();
 		blackPiecesCopy.splice(move[2], 1);
 	}
-	if (depth === 0) return evaluateBoard(whitePieces, blackPiecesCopy);
+	if (depth === 0) return simpleEvaluateBoard(whitePieces, blackPiecesCopy);
 	var evaluation = 1000;
 	var oldX = piece.currentX;
 	var oldY = piece.currentY;
 	piece.currentX = move[0];
-	piece.currentY = move[1];	
+	piece.currentY = move[1];
 	for (var ii = 0; ii < blackPiecesCopy.length; ii++) {
 		var moves = blackPiecesCopy[ii].getMoves(whitePieces, blackPiecesCopy);
 		for (var jj = 0; jj < moves.length; jj++) {
@@ -217,7 +277,7 @@ var thinkAsWhite = function(whitePieces, blackPieces, piece, move, depth) {
 		whitePiecesCopy = whitePieces.slice();
 		whitePiecesCopy.splice(move[2], 1);
 	}
-	if (depth === 0) return evaluateBoard(whitePiecesCopy, blackPieces);
+	if (depth === 0) return simpleEvaluateBoard(whitePiecesCopy, blackPieces);
 	var evaluation = -1000;
 	var oldX = piece.currentX;
 	var oldY = piece.currentY;
@@ -234,278 +294,7 @@ var thinkAsWhite = function(whitePieces, blackPieces, piece, move, depth) {
 	return evaluation;
 }
 
-/* Abstract class */
-var Piece = function(isWhite) {
-	this.isWhite = isWhite;
-	this.currentX = null;
-	this.currentY = this.isWhite ? 0 : 7;
-	
-	this.render = function() {
-		var that = this;
-		$('#chessboard tr:nth-child(' + (8 - this.currentY) + ') td:nth-child(' + (this.currentX + 1) +')')
-			.attr('draggable', true)
-			.on('dragstart', function(ev) { dragStart(ev, that) })
-			.html(this._symbol);
-	}
-			
-	this.SimpleRender = function() {
-		$('#chessboard tr:nth-child(' + (8 - this.currentY) + ') td:nth-child(' + (this.currentX + 1) +')').html(this._symbol);
-	}
-	
-	this.getMoves = function(w, b) {
-		throw 'NotImplementedException';
-		return moves;
-	}
-}
 
-/* Pieces behaviours */
-var WhitePawn = function(startX) {
-	this.base = Piece;
-	this.base(true);
-	this._symbol =  '♙';
-	this.currentX = startX;
-	this.currentY = 1;
-	this.value = 1;
-	
-	this.getMoves = function(w, b) {
-		var moves = [];
-		if (!isOccupied(this.currentX, this.currentY + 1, w, b)) {
-			moves.push([this.currentX, this.currentY + 1]);
-			if (this.currentY === 1 && !isOccupied(this.currentX, this.currentY + 2, w, b))
-				moves.push([this.currentX, this.currentY + 2]);
-		}
-		if (this.currentX < 7) {
-			for (var ii = 0; ii < blackPieces.length; ii++) {
-				var newX = this.currentX + 1;
-				var newY = this.currentY + 1;
-				if (blackPieces[ii].currentX === newX && blackPieces[ii].currentY === newY) {
-					moves.push([newX, newY, blackPieces[ii]]);
-					break;
-				}
-			}
-		}
-		if (this.currentX > 0) {
-			for (var ii = 0; ii < blackPieces.length; ii++) {
-				var newX = this.currentX - 1;
-				var newY = this.currentY + 1;
-				if (blackPieces[ii].currentX === newX && blackPieces[ii].currentY === newY) {
-					moves.push([newX, newY, blackPieces[ii]]);
-					break;
-				}
-			}
-		}
-		return moves;
-	}
-}
-
-var BlackPawn = function(startX) {
-	this.base = Piece;
-	this.base(false);
-	this._symbol =  '♟';
-	this.currentX = startX;
-	this.currentY = 6;
-	this.value = 1;
-	
-	this.getMoves = function(w, b) {
-		var moves = [];
-		if (!isOccupied(this.currentX, this.currentY - 1, w, b)) {
-			moves.push([this.currentX, this.currentY - 1]);
-			if (this.currentY === 6 && !isOccupied(this.currentX, this.currentY - 2, w, b))
-				moves.push([this.currentX, this.currentY - 2]);
-		}
-		if (this.currentX < 7) {
-			for (var ii = 0; ii < whitePieces.length; ii++) {
-				var newX = this.currentX + 1;
-				var newY = this.currentY - 1;
-				if (whitePieces[ii].currentX === newX && whitePieces[ii].currentY === newY) {
-					moves.push([newX, newY, whitePieces[ii]]);
-					break;
-				}
-			}
-		}
-		if (this.currentX > 0) {
-			for (var ii = 0; ii < whitePieces.length; ii++) {
-				var newX = this.currentX - 1;
-				var newY = this.currentY - 1;
-				if (whitePieces[ii].currentX === newX && whitePieces[ii].currentY === newY) {
-					moves.push([newX, newY, whitePieces[ii]]);
-					break;
-				}
-			}
-		}
-		return moves;
-	}
-}
-
-var Knight = function(isWhite, isLeft) {
-	this.base = Piece;
-	this.base(isWhite);
-	this._symbol =  this.isWhite ? '♘' : '♞';
-	this.currentX = isLeft ? 1 : 6;
-	this.value = 2;
-	
-	this.getMoves = function(w, b) {
-		var moves = [];
-		if (this.currentX > 0) {
-			if (this.currentY > 1)
-				addMove(this.currentX - 1, this.currentY - 2, this.isWhite, moves, w, b);
-			if (this.currentY < 6)
-				addMove(this.currentX - 1, this.currentY + 2, this.isWhite, moves, w, b);
-			if (this.currentX > 1) {
-				if (this.currentY > 0)
-					addMove(this.currentX - 2, this.currentY - 1, this.isWhite, moves, w, b);
-				if (this.currentY < 7)
-					addMove(this.currentX - 2, this.currentY + 1, this.isWhite, moves, w, b);
-			}
-		}
-		if (this.currentX < 7) {
-			if (this.currentY > 1)
-				addMove(this.currentX + 1, this.currentY - 2, this.isWhite, moves, w, b);
-			if (this.currentY < 6)
-				addMove(this.currentX + 1, this.currentY + 2, this.isWhite, moves, w, b);
-			if (this.currentX < 6) {
-				if (this.currentY > 0)
-					addMove(this.currentX + 2, this.currentY - 1, this.isWhite, moves, w, b);
-				if (this.currentY < 7)
-					addMove(this.currentX + 2, this.currentY + 1, this.isWhite, moves, w, b);
-			}
-		}
-		return moves;
-	}
-}
-
-var Bishop = function(isWhite, isLeft) {
-	this.base = Piece;
-	this.base(isWhite);
-	this._symbol =  this.isWhite ? '♗' : '♝';
-	this.currentX = isLeft ? 2 : 5;
-	this.value = 2;
-	
-	this.getMoves = function(w, b) {
-		var moves = [];
-		var tl = Math.min(this.currentX, 7 - this.currentY);
-		var tr = Math.min(7 - this.currentX, 7 - this.currentY);
-		var br = Math.min(7 - this.currentX, this.currentY);
-		var bl = Math.min(this.currentX, this.currentY);
-		for (var ii = 1; ii <= tl; ii++) {
-			if (addMove(this.currentX - ii, this.currentY + ii, isWhite, moves, w, b)) break;
-		}
-		for (var ii = 1; ii <= tr; ii++) {
-			if (addMove(this.currentX + ii, this.currentY + ii, isWhite, moves, w, b)) break;
-		}
-		for (var ii = 1; ii <= br; ii++) {
-			if (addMove(this.currentX + ii, this.currentY - ii, isWhite, moves, w, b)) break;
-		}
-		for (var ii = 1; ii <= bl; ii++) {
-			if (addMove(this.currentX - ii, this.currentY - ii, isWhite, moves, w, b)) break;
-		}
-		return moves;
-	}
-}
-
-var Rook = function(isWhite, isLeft) {
-	this.base = Piece;
-	this.base(isWhite);
-	this._symbol =  this.isWhite ? '♖' : '♜';
-	this.currentX = isLeft ? 0 : 7;
-	this.value = 4;
-	
-	this.getMoves = function(w, b) {
-		var moves = [];
-		for (var ii = this.currentX + 1; ii < 8; ii++) {
-			if (addMove(ii, this.currentY, isWhite, moves, w, b)) break;
-		}
-		for (var ii = this.currentX - 1; ii >= 0; ii--) {
-			if (addMove(ii, this.currentY, isWhite, moves, w, b)) break;
-		}
-		for (var ii = this.currentY + 1; ii < 8; ii++) {
-			if (addMove(this.currentX, ii, isWhite, moves, w, b)) break;
-		}
-		for (var ii = this.currentY - 1; ii >= 0; ii--) {
-			if (addMove(this.currentX, ii, isWhite, moves, w, b)) break;
-		}
-		return moves;
-	}
-}
-
-var Queen = function(isWhite) {
-	this.base = Piece;
-	this.base(isWhite);
-	this._symbol =  this.isWhite ? '♕' : '♛';
-	this.currentX = 3;
-	this.value = 8;
-	
-	this.getMoves = function(w, b) {
-		var moves = [];
-		// Line
-		for (var ii = this.currentX + 1; ii < 8; ii++) {
-			if (addMove(ii, this.currentY, isWhite, moves, w, b)) break;
-		}
-		for (var ii = this.currentX - 1; ii >= 0; ii--) {
-			if (addMove(ii, this.currentY, isWhite, moves, w, b)) break;
-		}
-		for (var ii = this.currentY + 1; ii < 8; ii++) {
-			if (addMove(this.currentX, ii, isWhite, moves, w, b)) break;
-		}
-		for (var ii = this.currentY - 1; ii >= 0; ii--) {
-			if (addMove(this.currentX, ii, isWhite, moves, w, b)) break;
-		}
-		// Diag
-		var tl = Math.min(this.currentX, 7 - this.currentY);
-		var tr = Math.min(7 - this.currentX, 7 - this.currentY);
-		var br = Math.min(7 - this.currentX, this.currentY);
-		var bl = Math.min(this.currentX, this.currentY);
-		for (var ii = 1; ii <= tl; ii++) {
-			if (addMove(this.currentX - ii, this.currentY + ii, isWhite, moves, w, b)) break;
-		}
-		for (var ii = 1; ii <= tr; ii++) {
-			if (addMove(this.currentX + ii, this.currentY + ii, isWhite, moves, w, b)) break;
-		}
-		for (var ii = 1; ii <= br; ii++) {
-			if (addMove(this.currentX + ii, this.currentY - ii, isWhite, moves, w, b)) break;
-		}
-		for (var ii = 1; ii <= bl; ii++) {
-			if (addMove(this.currentX - ii, this.currentY - ii, isWhite, moves, w, b)) break;
-		}
-		return moves;
-	}
-}
-
-var King = function(isWhite) {
-	this.base = Piece;
-	this.base(isWhite);
-	this._symbol =  this.isWhite ? '♔' : '♚';
-	this.currentX = 4;
-	this.value = 100;
-	
-	this.getMoves = function(w, b) {
-		var moves = [];
-		if (this.currentY > 0) {
-			addMove(this.currentX, this.currentY - 1, this.isWhite, moves, w, b);
-			if (this.currentX > 0)
-				addMove(this.currentX - 1, this.currentY - 1, this.isWhite, moves, w, b);
-			if (this.currentX < 7)
-				addMove(this.currentX + 1, this.currentY - 1, this.isWhite, moves, w, b);
-		}
-		if (this.currentY < 7) {
-			addMove(this.currentX, this.currentY + 1, this.isWhite, moves, w, b);
-			if (this.currentX > 0)
-				addMove(this.currentX - 1, this.currentY + 1, this.isWhite, moves, w, b);
-			if (this.currentX < 7)
-				addMove(this.currentX + 1, this.currentY + 1, this.isWhite, moves, w, b);
-		}
-		if (this.currentX > 0)
-			addMove(this.currentX - 1, this.currentY, this.isWhite, moves, w, b);
-		if (this.currentX < 7)
-			addMove(this.currentX + 1, this.currentY, this.isWhite, moves, w, b);
-		
-		// TODO : Add rock
-		// Only if neither King nor Rook has moved
-		// Only if King is not checked while rocking -_-
-		
-		return moves;
-	}
-}
 
 
 /* Init */
@@ -523,15 +312,13 @@ FIXME
 
 Implement pawn promotion
 Implement rock
+Detect stalemate
 
 TODO
 
+Let AI play as white or black
 Do not decrement depth when a piece is taken
 Progressively increase depth as the number of pieces decreases
-Implement complex board evaluation for first level moves
-	Add bonus for control of the center
-	Add bonus for movement freedom
-	Add bonus for pieces threatened/defended
 Use setTimeout to avoid freeze
 Replace "pieces" and "getPieceAt" with a dictionary search ?
 Use specific/dynamic functions for getMoves
