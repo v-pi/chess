@@ -5,11 +5,19 @@ var initBoard = function() {
 	for (var ii = 7; ii >=0; ii--) {
 		var row = '<tr>';
 		for (var jj = 0; jj < 8; jj++) {
-			row += '<td data-x="' + jj + '" data-y="' + ii + '" ondrop="dropped(event)" ondragend="dragEnd(event)"></td>';
+			row += '<td ondrop="dropped(event, ' + jj + ', ' + ii + ')" ondragend="dragEnd(event)"></td>';
 		}
 		row += '</td>'
 		$('#chessboard').append(row);
 	}
+	
+	whitePieces.push(new King(true));
+	blackPieces.push(new King(false));
+	
+	whitePieces.push(new Rook(true, true));
+	whitePieces.push(new Rook(true, false));
+	blackPieces.push(new Rook(false, true));
+	blackPieces.push(new Rook(false, false));
 	
 	for (var ii = 0; ii < 8; ii++) {
 		whitePieces.push(new WhitePawn(ii));
@@ -26,16 +34,8 @@ var initBoard = function() {
 	blackPieces.push(new Bishop(false, true));
 	blackPieces.push(new Bishop(false, false));
 	
-	whitePieces.push(new Rook(true, true));
-	whitePieces.push(new Rook(true, false));
-	blackPieces.push(new Rook(false, true));
-	blackPieces.push(new Rook(false, false));
-	
 	whitePieces.push(new Queen(true));
 	blackPieces.push(new Queen(false));
-	
-	whitePieces.push(new King(true));
-	blackPieces.push(new King(false));
 	
 	for (var ii = 0; ii < 16; ii++) {
 		whitePieces[ii].arrayIndex = ii;
@@ -133,7 +133,7 @@ var complexEvaluateBoard = function(isWhitePlaying, w, b) {
 			// movement freedom
 			advantage += 0.1;
 			// enemy pieces threatened
-			if (moves[jj].length > 2)
+			if (moves[jj].length === 3)
 				advantage += enemyPieces[moves[jj][2]].value;
 			// control of the center
 			if (moves[jj][0] === 3 && moves[jj][1] === 3) advantage += 0.5;
@@ -179,8 +179,36 @@ var executeMove = function(piece, newX, newY) {
 	var newRowIndex = 8 - newY;
 	$('#chessboard tr:nth-child(' + oldRowIndex + ') td:nth-child(' + oldColIndex +')').html('').off('dragstart').removeAttr('draggable');
 	$('#chessboard tr:nth-child(' + newRowIndex + ') td:nth-child(' + newColIndex +')').off('dragstart').removeAttr('draggable');
+	if (piece.value === 1) { // pawn promotion
+		if ((piece.isWhite && newY === 7) || (!piece.isWhite && newY === 0)) {
+			piece._symbol = piece.isWhite ? '♕' : '♛';
+			piece.value = 8;
+			piece.getMoves = Queen.prototype.getMoves
+		}
+	}
 	piece.currentX = newX;
 	piece.currentY = newY;
+	
+	if (piece.canCastle && (newX === 2 || newX === 6)) { // castling
+		piece.canCastle = false;
+		piece.addCastlingMoves = function() { };
+		if (newX === 2) { // Queen side
+			var rook = getPieceAt(0, piece.currentY, whitePieces, blackPieces);
+			executeMove(rook, 3, piece.currentY);
+			return;
+		} else if (newX === 6) { // King side
+			var rook = getPieceAt(7, piece.currentY, whitePieces, blackPieces);
+			executeMove(rook, 5, piece.currentY);
+			return;
+		}
+	}
+	
+	if (piece.hasMoved === false) piece.hasMoved = true;
+	if (piece.canCastle) {
+		piece.canCastle = false;
+		piece.addCastlingMoves = function() { };
+	}
+	
 	for (var ii = 0; ii < whitePieces.length; ii++)
 		whitePieces[ii].arrayIndex = ii;
 	for (var ii = 0; ii < blackPieces.length; ii++)
@@ -217,10 +245,12 @@ var think = function(isWhitePlaying) {
 	for (var ii = 0; ii < acceptableMoves.length; ii++) {
 		var move = acceptableMoves[ii].move;
 		var piece = acceptableMoves[ii].piece;
+		if (move.length === 4) // castle whenever possible
+			return { piece : piece, move : move };
 		
 		var whitePiecesCopy = whitePieces;
 		var blackPiecesCopy = blackPieces;
-		if (move.length > 2) { // a piece is taken
+		if (move.length === 3) { // a piece is taken
 			if (isWhitePlaying) {
 				blackPiecesCopy = blackPieces.slice();
 				blackPiecesCopy.splice(move[2], 1);
@@ -236,7 +266,7 @@ var think = function(isWhitePlaying) {
 		
 		var tempEval = complexEvaluateBoard(isWhitePlaying, whitePieces, blackPieces);
 		console.log(piece._symbol + ' at ' + oldX + ', ' + oldY + ' moving to ' + move[0] + ', ' + move[1] + ' has a complex evaluation of ' + tempEval);
-		if (tempEval > evaluation) {
+		if (tempEval >= evaluation) {
 			chosenMove = move;
 			chosenPiece = piece;
 			evaluation = tempEval;
@@ -250,7 +280,12 @@ var think = function(isWhitePlaying) {
 
 var thinkAsBlack = function(whitePieces, blackPieces, piece, move, depth) {
 	var blackPiecesCopy = blackPieces;
-	if (move.length > 2) { // a piece is taken
+	var oldValue = piece.value;
+	if (oldValue === 1 && move[1] === 7) piece.value = 8; // enemy pawn being promoted
+	if (move.length === 3) { // a piece is taken
+		if (move[2] === 0) {// and it is the king !
+			return 200;
+		}
 		blackPiecesCopy = blackPieces.slice();
 		blackPiecesCopy.splice(move[2], 1);
 	}
@@ -268,12 +303,18 @@ var thinkAsBlack = function(whitePieces, blackPieces, piece, move, depth) {
 	}
 	piece.currentX = oldX;
 	piece.currentY = oldY;
+	piece.value = oldValue;
 	return evaluation;
 }
 
 var thinkAsWhite = function(whitePieces, blackPieces, piece, move, depth) {
 	var whitePiecesCopy = whitePieces;
-	if (move.length > 2) { // a piece is taken
+	var oldValue = piece.value;
+	if (oldValue === 1 && move[1] === 0) piece.value = 8; // enemy pawn being promoted
+	if (move.length === 3) { // a piece is taken
+		if (move[2] === 0) {// and it is the king !
+			return -200;
+		}
 		whitePiecesCopy = whitePieces.slice();
 		whitePiecesCopy.splice(move[2], 1);
 	}
@@ -282,7 +323,7 @@ var thinkAsWhite = function(whitePieces, blackPieces, piece, move, depth) {
 	var oldX = piece.currentX;
 	var oldY = piece.currentY;
 	piece.currentX = move[0];
-	piece.currentY = move[1];	
+	piece.currentY = move[1];
 	for (var ii = 0; ii < whitePiecesCopy.length; ii++) {
 		var moves = whitePiecesCopy[ii].getMoves(whitePiecesCopy, blackPieces);
 		for (var jj = 0; jj < moves.length; jj++) {			
@@ -291,11 +332,13 @@ var thinkAsWhite = function(whitePieces, blackPieces, piece, move, depth) {
 	}
 	piece.currentX = oldX;
 	piece.currentY = oldY;
+	piece.value = oldValue;
 	return evaluation;
 }
 
-
-
+var logPieceMovement = function(piece, oldX, oldY, move) {
+	console.debug((piece.isWhite ? 'White ' : 'Black ') + piece._symbol + ' at ' + oldX + ', ' + oldY + ' moving to ' + move[0] + ', ' + move[1]);	
+}
 
 /* Init */
 $(document).ready(function() {
@@ -310,15 +353,15 @@ $(document).ready(function() {
 
 FIXME
 
-Implement pawn promotion
-Implement rock
 Detect stalemate
+Force to save king when checked
 
 TODO
 
 Let AI play as white or black
-Do not decrement depth when a piece is taken
+Forbid multiple turns
 Progressively increase depth as the number of pieces decreases
+Display estimated time
 Use setTimeout to avoid freeze
 Replace "pieces" and "getPieceAt" with a dictionary search ?
 Use specific/dynamic functions for getMoves
@@ -327,6 +370,11 @@ Add debug :
 	- evaluation history
 	- expected moves from opponent ?
 	- piece list with properties
+Show last move
 	
+
+CANCELED
+	
+Do not decrement depth when a piece is taken (too complex)
 
 */

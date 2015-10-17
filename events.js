@@ -23,16 +23,9 @@ function dragEnd(ev) {
 	}
 }
 
-function dropped(ev) {
+function dropped(ev, newX, newY) {
 	var isWhite = ev.dataTransfer.getData("isWhite") === 'true';
 	var arrayIndex = ev.dataTransfer.getData("arrayIndex") * 1;
-	var cell = $(ev.target);
-	var row = $(ev.target).parent();
-	var newX = row.index(cell);
-	var newY = 7 - $('#chessboard').index(row);
-	
-	var newX = $(ev.target).attr('data-x') * 1;
-	var newY = $(ev.target).attr('data-y') * 1;
 	var piece = isWhite ? whitePieces[arrayIndex] : blackPieces[arrayIndex];
 	executeMove(piece, newX, newY);
 	$('#button').show();
