@@ -19,7 +19,6 @@ function dragEnd(ev) {
 	for (var ii = 0; ii < coloredCells.length; ii++) {
 		$('#chessboard tr:nth-child(' + coloredCells[ii][0] + ') td:nth-child(' + coloredCells[ii][1] +')').css('background-color', '');
 		$('#chessboard tr:nth-child(' + coloredCells[ii][0] + ') td:nth-child(' + coloredCells[ii][1] +')').off('dragover');
-		
 	}
 }
 

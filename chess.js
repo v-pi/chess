@@ -229,8 +229,8 @@ var think = function(isWhitePlaying) {
 		for (var jj = 0; jj < moves.length; jj++) {
 			var move = moves[jj];
 			var tempEval = 0;
-			if (isWhitePlaying) tempEval = thinkAsBlack(whitePieces, blackPieces, pieces[ii], move, depth);
-			else tempEval = -1 * thinkAsWhite(whitePieces, blackPieces, pieces[ii], move, depth);
+			if (isWhitePlaying) tempEval = thinkAsBlack(whitePieces, blackPieces, pieces[ii], move, depth - 1);
+			else tempEval = -1 * thinkAsWhite(whitePieces, blackPieces, pieces[ii], move, depth - 1);
 			console.log(pieces[ii]._symbol + ' at ' + pieces[ii].currentX + ', ' + pieces[ii].currentY + ' moving to ' + move[0] + ', ' + move[1] + ' has a simple evaluation of ' + tempEval);
 			if (tempEval > evaluation) {
 				acceptableMoves = [{piece : pieces[ii], move : move }];
@@ -345,7 +345,10 @@ $(document).ready(function() {
 	$.event.props.push('dataTransfer');
 	initBoard();
 	$('#button').click(function() { play(); });
-	$('#test').html('-');
+	$('#depth').html(getDepth());
+	$('#depthinput').change(
+		function(newVal) { $('#depth').html(getDepth()); }
+		);
 });
 
 
@@ -371,6 +374,7 @@ Add debug :
 	- expected moves from opponent ?
 	- piece list with properties
 Show last move
+Display pieces taken
 	
 
 CANCELED

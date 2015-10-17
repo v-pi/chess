@@ -21,8 +21,3 @@ tr:nth-child(even) td:nth-child(odd), tr:nth-child(odd) td:nth-child(even) {
 #container {
 	margin:100px;
 }
-
-#depthinput {
-	width:20px;
-	border: none;
-}
