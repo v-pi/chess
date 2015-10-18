@@ -1,5 +1,7 @@
+var board = [];
 var whitePieces = [];
 var blackPieces = [];
+var emptyCell = { isEmpty : true };
 
 var initBoard = function() {
 	for (var ii = 7; ii >=0; ii--) {
@@ -9,6 +11,15 @@ var initBoard = function() {
 		}
 		row += '</td>'
 		$('#chessboard').append(row);
+	}
+	
+	for (var ii = 0; ii < 8; ii++)
+	{
+		board.push([]); 
+		for (var jj = 0; jj  < 8; jj++)
+		{
+			board[ii].push(emptyCell);
+		}
 	}
 	
 	whitePieces.push(new King(true));
@@ -38,6 +49,15 @@ var initBoard = function() {
 	blackPieces.push(new Queen(false));
 	
 	for (var ii = 0; ii < 16; ii++) {
+		var piece = whitePieces[ii];
+		piece.arrayIndex = ii;
+		board[piece.currentX][piece.currentY] = piece;
+		var piece = blackPieces[ii];
+		piece.arrayIndex = ii;
+		board[piece.currentX][piece.currentY] = piece;
+	}
+	
+	for (var ii = 0; ii < 16; ii++) {
 		whitePieces[ii].arrayIndex = ii;
 		blackPieces[ii].arrayIndex = ii;
 	}
@@ -46,65 +66,31 @@ var initBoard = function() {
 }
 
 var renderBoard = function() {
-	for (var ii = 0; ii < whitePieces.length; ii++) {
-		whitePieces[ii].render();
-	}
-	for (var ii = 0; ii < blackPieces.length; ii++) {
-		blackPieces[ii].render();
+	for (var ii = 0; ii < 8; ii++) {
+		for (var jj = 0; jj < 8; jj++) {
+			if (board[ii][jj].render) board[ii][jj].render();
+		}
 	}
 }
 
-// Checks if the cell is occupied
-var isOccupied = function(x, y, whitePieces, blackPieces) {
-	for (var ii = 0; ii < whitePieces.length; ii++) {
-		var piece = whitePieces[ii];
-		if (piece.currentX === x && piece.currentY === y) {
+// // Adds the move if the cell is empty or occupied by the enemy
+// // Returns true if the cell is occupied
+var addMove = function(x, y, isWhite, moves, board, w, b) {
+	var cell = board[x][y];
+	if (cell.isEmpty) {
+		moves.push([x, y]);
+		return false;
+	}
+	if (cell.isWhite === isWhite) {
+		return true;
+	}
+	var enemyPieces = isWhite ? b : w;
+	for (var ii = 0; ii < enemyPieces.length; ii++) {
+		if (enemyPieces[ii].currentX === x && enemyPieces[ii].currentY === y) {
+			moves.push([x, y, ii]);
 			return true;
 		}
 	}
-	for (var ii = 0; ii < blackPieces.length; ii++) {
-		var piece = blackPieces[ii];
-		if (piece.currentX === x && piece.currentY === y) {
-			return true;
-		}
-	}
-	return false;
-}
-
-// Checks if the cell is occupied
-// Returns the piece occupying if it is
-// Returns an empty structure if it is not
-var getPieceAt = function(x, y, whitePieces, blackPieces) {
-	for (var ii = 0; ii < whitePieces.length; ii++) {
-		if (whitePieces[ii].currentX === x && whitePieces[ii].currentY === y) {
-			return whitePieces[ii];
-		}
-	}
-	for (var ii = 0; ii < blackPieces.length; ii++) {
-		if (blackPieces[ii].currentX === x && blackPieces[ii].currentY === y) {
-			return blackPieces[ii];
-		}
-	}
-	return {};
-}
-
-// Adds the move if the cell is empty or occupied by the enemy
-// Returns true if the cell is occupied
-var addMove = function(x, y, isWhite, moves, whitePieces, blackPieces) {
-	for (var ii = 0; ii < whitePieces.length; ii++) {
-		if (whitePieces[ii].currentX === x && whitePieces[ii].currentY === y) {
-			if (!isWhite) moves.push([x, y, ii]);
-			return true;
-		}
-	}
-	for (var ii = 0; ii < blackPieces.length; ii++) {
-		if (blackPieces[ii].currentX === x && blackPieces[ii].currentY === y) {
-			if (isWhite) moves.push([x, y, ii]);
-			return true;
-		}
-	}
-	moves.push([x, y]);
-	return false;
 }
 
 var simpleEvaluateBoard = function(w, b) {
@@ -118,7 +104,7 @@ var simpleEvaluateBoard = function(w, b) {
 	return advantageWhite;
 }
 
-var complexEvaluateBoard = function(isWhitePlaying, w, b) {
+var complexEvaluateBoard = function(isWhitePlaying, board, w, b) {
 	var advantage = 0;
 	if (isWhitePlaying) {
 		var pieces = w;
@@ -128,7 +114,7 @@ var complexEvaluateBoard = function(isWhitePlaying, w, b) {
 		var enemyPieces = w;
 	}
 	for (var ii = 0; ii < pieces.length; ii++) {
-		var moves = pieces[ii].getMoves(w, b);
+		var moves = pieces[ii].getMoves(board, w, b);
 		for (var jj = 0; jj < moves.length; jj++) {
 			// movement freedom
 			advantage += 0.1;
@@ -153,16 +139,20 @@ var setDepth = function(value) {
 	return $('#depthinput').val(value);
 }
 
+var isPlayingWhite = function() {
+	return $('input[name=side]:checked', '#options').val() === 'white';
+}
+
 var play = function() {
 	$('#button').hide();
 	console.log('start');
-	var result = think(true);
+	var result = think(!isPlayingWhite());
 	executeMove(result.piece, result.move[0], result.move[1]);
 	console.log('stop');
 }
 
 var executeMove = function(piece, newX, newY) {
-	var pieceWhereMoving = getPieceAt(newX, newY, whitePieces, blackPieces);
+	var pieceWhereMoving = board[newX][newY];
 	{
 		if (pieceWhereMoving.isWhite === true) {
 			var index = whitePieces.indexOf(pieceWhereMoving);
@@ -186,18 +176,20 @@ var executeMove = function(piece, newX, newY) {
 			piece.getMoves = Queen.prototype.getMoves
 		}
 	}
+	board[piece.currentX][piece.currentY] = emptyCell;
 	piece.currentX = newX;
 	piece.currentY = newY;
+	board[newX][newY] = piece;
 	
 	if (piece.canCastle && (newX === 2 || newX === 6)) { // castling
 		piece.canCastle = false;
-		piece.addCastlingMoves = function() { };
+		piece.addCastlingMoves = function() { }; // this complex function has no use anymore
 		if (newX === 2) { // Queen side
-			var rook = getPieceAt(0, piece.currentY, whitePieces, blackPieces);
+			var rook = board[0][piece.currentY];
 			executeMove(rook, 3, piece.currentY);
 			return;
 		} else if (newX === 6) { // King side
-			var rook = getPieceAt(7, piece.currentY, whitePieces, blackPieces);
+			var rook = board[7][piece.currentY];
 			executeMove(rook, 5, piece.currentY);
 			return;
 		}
@@ -220,17 +212,18 @@ var executeMove = function(piece, newX, newY) {
 var think = function(isWhitePlaying) {
 	var chosenPiece;
 	var chosenMove;
-	var evaluation = isWhitePlaying ? -1000 : 1000;
+	var evaluation = -1000;
 	var depth = getDepth();
 	var pieces = isWhitePlaying ? whitePieces : blackPieces;
 	var acceptableMoves = [];
+	var currentEval = simpleEvaluateBoard(whitePieces, blackPieces);
 	for (var ii = 0; ii < pieces.length; ii++) {
-		var moves = pieces[ii].getMoves(whitePieces, blackPieces);
+		var moves = pieces[ii].getMoves(board, whitePieces, blackPieces);
 		for (var jj = 0; jj < moves.length; jj++) {
 			var move = moves[jj];
 			var tempEval = 0;
-			if (isWhitePlaying) tempEval = thinkAsBlack(whitePieces, blackPieces, pieces[ii], move, depth - 1);
-			else tempEval = -1 * thinkAsWhite(whitePieces, blackPieces, pieces[ii], move, depth - 1);
+			if (isWhitePlaying) tempEval = thinkAsBlack(board, whitePieces, blackPieces, pieces[ii], move, depth - 1, currentEval);
+			else tempEval = -1 * thinkAsWhite(board, whitePieces, blackPieces, pieces[ii], move, depth - 1, currentEval);
 			console.log(pieces[ii]._symbol + ' at ' + pieces[ii].currentX + ', ' + pieces[ii].currentY + ' moving to ' + move[0] + ', ' + move[1] + ' has a simple evaluation of ' + tempEval);
 			if (tempEval > evaluation) {
 				acceptableMoves = [{piece : pieces[ii], move : move }];
@@ -241,10 +234,12 @@ var think = function(isWhitePlaying) {
 		}
 	}
 	console.log('Acceptable moves : ' + acceptableMoves.length);
-	evaluation = isWhitePlaying ? -1000 : 1000;
+	evaluation = -1000;
 	for (var ii = 0; ii < acceptableMoves.length; ii++) {
 		var move = acceptableMoves[ii].move;
 		var piece = acceptableMoves[ii].piece;
+		if (piece.value === 1 && move[1] === (isWhitePlaying ? 7 : 0)) // promote whenever possible
+			return { piece : piece, move : move };
 		if (move.length === 4) // castle whenever possible
 			return { piece : piece, move : move };
 		
@@ -264,7 +259,7 @@ var think = function(isWhitePlaying) {
 		piece.currentX = move[0];
 		piece.currentY = move[1];
 		
-		var tempEval = complexEvaluateBoard(isWhitePlaying, whitePieces, blackPieces);
+		var tempEval = complexEvaluateBoard(isWhitePlaying, board, whitePieces, blackPieces);
 		console.log(piece._symbol + ' at ' + oldX + ', ' + oldY + ' moving to ' + move[0] + ', ' + move[1] + ' has a complex evaluation of ' + tempEval);
 		if (tempEval >= evaluation) {
 			chosenMove = move;
@@ -278,16 +273,21 @@ var think = function(isWhitePlaying) {
 	return { piece : chosenPiece, move : chosenMove };
 }
 
-var thinkAsBlack = function(whitePieces, blackPieces, piece, move, depth) {
+var thinkAsBlack = function(board, whitePieces, blackPieces, piece, move, depth, currentEval) {
+	if (move[2] === 0) return 200;// king was taken !
 	var blackPiecesCopy = blackPieces;
-	var oldValue = piece.value;
-	if (oldValue === 1 && move[1] === 7) piece.value = 8; // enemy pawn being promoted
+	var pieceTaken = emptyCell;
+	var pawnWasPromoted = piece.value === 1 && move[1] === 7;
+	if (pawnWasPromoted) { // enemy pawn being promoted
+		if (depth === 0) return currentEval + 7;
+		piece.value = 8;
+		piece.getMoves = Queen.prototype.getMoves;
+		currentEval += 7;
+	}
 	if (move.length === 3) { // a piece is taken
-		if (move[2] === 0) {// and it is the king !
-			return 200;
-		}
 		blackPiecesCopy = blackPieces.slice();
-		blackPiecesCopy.splice(move[2], 1);
+		pieceTaken = blackPiecesCopy.splice(move[2], 1)[0];
+		currentEval += pieceTaken.value;
 	}
 	if (depth === 0) return simpleEvaluateBoard(whitePieces, blackPiecesCopy);
 	var evaluation = 1000;
@@ -295,44 +295,63 @@ var thinkAsBlack = function(whitePieces, blackPieces, piece, move, depth) {
 	var oldY = piece.currentY;
 	piece.currentX = move[0];
 	piece.currentY = move[1];
+	board[oldX][oldY] = emptyCell;
+	board[move[0]][move[1]] = piece;
 	for (var ii = 0; ii < blackPiecesCopy.length; ii++) {
-		var moves = blackPiecesCopy[ii].getMoves(whitePieces, blackPiecesCopy);
+		var moves = blackPiecesCopy[ii].getMoves(board, whitePieces, blackPiecesCopy);
 		for (var jj = 0; jj < moves.length; jj++) {
-			evaluation = Math.min(thinkAsWhite(whitePieces, blackPiecesCopy, blackPiecesCopy[ii], moves[jj], depth - 1), evaluation);
+			evaluation = Math.min(thinkAsWhite(board, whitePieces, blackPiecesCopy, blackPiecesCopy[ii], moves[jj], depth - 1, currentEval), evaluation);
 		}
 	}
 	piece.currentX = oldX;
 	piece.currentY = oldY;
-	piece.value = oldValue;
+	if (pawnWasPromoted) {
+		piece.value = 1;
+		piece.getMoves = WhitePawn.prototype.getMoves;
+	}
+	board[oldX][oldY] = piece;
+	board[move[0]][move[1]] = pieceTaken;
 	return evaluation;
 }
 
-var thinkAsWhite = function(whitePieces, blackPieces, piece, move, depth) {
+var thinkAsWhite = function(board, whitePieces, blackPieces, piece, move, depth, currentEval) {
+	if (move[2] === 0) return -200; // king was taken !
 	var whitePiecesCopy = whitePieces;
-	var oldValue = piece.value;
-	if (oldValue === 1 && move[1] === 0) piece.value = 8; // enemy pawn being promoted
-	if (move.length === 3) { // a piece is taken
-		if (move[2] === 0) {// and it is the king !
-			return -200;
-		}
-		whitePiecesCopy = whitePieces.slice();
-		whitePiecesCopy.splice(move[2], 1);
+	var pieceTaken = emptyCell;
+	var pawnWasPromoted = piece.value === 1 && move[1] === 0;
+	if (pawnWasPromoted) { // enemy pawn being promoted
+		if (depth === 0) return currentEval - 7;
+		piece.value = 8;
+		piece.getMoves = Queen.prototype.getMoves;
+		currentEval -= 7;
 	}
-	if (depth === 0) return simpleEvaluateBoard(whitePiecesCopy, blackPieces);
+	if (move.length === 3) { // a piece is taken
+		whitePiecesCopy = whitePieces.slice();
+		pieceTaken = whitePiecesCopy.splice(move[2], 1)[0];
+		currentEval -= pieceTaken.value;
+	}
+	if (depth === 0) return currentEval;
 	var evaluation = -1000;
 	var oldX = piece.currentX;
 	var oldY = piece.currentY;
 	piece.currentX = move[0];
 	piece.currentY = move[1];
+	board[oldX][oldY] = emptyCell;
+	board[move[0]][move[1]] = piece;
 	for (var ii = 0; ii < whitePiecesCopy.length; ii++) {
-		var moves = whitePiecesCopy[ii].getMoves(whitePiecesCopy, blackPieces);
+		var moves = whitePiecesCopy[ii].getMoves(board, whitePiecesCopy, blackPieces);
 		for (var jj = 0; jj < moves.length; jj++) {			
-			evaluation = Math.max(thinkAsBlack(whitePiecesCopy, blackPieces, whitePiecesCopy[ii], moves[jj], depth - 1), evaluation);
+			evaluation = Math.max(thinkAsBlack(board, whitePiecesCopy, blackPieces, whitePiecesCopy[ii], moves[jj], depth - 1, currentEval), evaluation);
 		}
 	}
 	piece.currentX = oldX;
 	piece.currentY = oldY;
-	piece.value = oldValue;
+	if (pawnWasPromoted) {
+		piece.value = 1;
+		piece.getMoves = BlackPawn.prototype.getMoves;
+	}
+	board[oldX][oldY] = piece;
+	board[move[0]][move[1]] = pieceTaken;
 	return evaluation;
 }
 
@@ -361,13 +380,10 @@ Force to save king when checked
 
 TODO
 
-Let AI play as white or black
 Forbid multiple turns
 Progressively increase depth as the number of pieces decreases
 Display estimated time
 Use setTimeout to avoid freeze
-Replace "pieces" and "getPieceAt" with a dictionary search ?
-Use specific/dynamic functions for getMoves
 Add debug : 
 	- move history
 	- evaluation history
