@@ -1,7 +1,7 @@
 function dragStart(ev, piece) {
 	var data = (piece.isWhite ? 'white' : 'black') + ';' + piece.arrayIndex;
     ev.dataTransfer.setData("text", data);
-	var moves = piece.getMoves(whitePieces, blackPieces);
+	var moves = piece.getMoves(board, whitePieces, blackPieces);
 	coloredCells = [];
 	for (var ii = 0; ii < moves.length; ii++) {
 		var move = moves[ii];
