@@ -375,7 +375,7 @@ Add debug :
 	- piece list with properties
 Show last move
 Display pieces taken
-	
+
 
 CANCELED
 	

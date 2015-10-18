@@ -1,6 +1,6 @@
 function dragStart(ev, piece) {
-    ev.dataTransfer.setData("isWhite", piece.isWhite ? 'true' : '');
-    ev.dataTransfer.setData("arrayIndex", piece.arrayIndex);
+	var data = (piece.isWhite ? 'white' : 'black') + ';' + piece.arrayIndex;
+    ev.dataTransfer.setData("text", data);
 	var moves = piece.getMoves(whitePieces, blackPieces);
 	coloredCells = [];
 	for (var ii = 0; ii < moves.length; ii++) {
@@ -23,8 +23,9 @@ function dragEnd(ev) {
 }
 
 function dropped(ev, newX, newY) {
-	var isWhite = ev.dataTransfer.getData("isWhite") === 'true';
-	var arrayIndex = ev.dataTransfer.getData("arrayIndex") * 1;
+	var data =  ev.dataTransfer.getData("text").split(';');
+	var isWhite = data[0] === 'white';
+	var arrayIndex = data[1] * 1;
 	var piece = isWhite ? whitePieces[arrayIndex] : blackPieces[arrayIndex];
 	executeMove(piece, newX, newY);
 	$('#button').show();
