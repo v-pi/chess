@@ -151,9 +151,9 @@ var play = function() {
 	think(!isPlayingWhite());
 }
 
-var checkKingChecked = function(board, whitePieces, blackPieces) {
-	var king = isPlayingWhite() ? whitePieces[0] : blackPieces[0];
-	var enemyPieces = isPlayingWhite() ? blackPieces : whitePieces;
+var checkKingChecked = function(isWhitePlaying, board, whitePieces, blackPieces) {
+	var king = isWhitePlaying ? whitePieces[0] : blackPieces[0];
+	var enemyPieces = isWhitePlaying ? blackPieces : whitePieces;
 	for (var ii = 0; ii < enemyPieces.length; ii++) {
 		var moves = enemyPieces[ii].getMoves(board, whitePieces, blackPieces);
 		for (var jj = 0; jj < moves.length; jj++) {
@@ -220,6 +220,9 @@ var executeMove = function(piece, newX, newY) {
 	for (var ii = 0; ii < blackPieces.length; ii++)
 		blackPieces[ii].arrayIndex = ii;
 	
+	if (checkKingChecked(piece.isWhite, board, whitePieces, blackPieces))
+		console.info('King checked');
+	
 	renderBoard();
 }
 
@@ -281,9 +284,9 @@ var chooseBetweenAcceptableMoves = function(allMoves, isWhitePlaying)
 		var move = acceptableMoves[ii].move;
 		var piece = acceptableMoves[ii].piece;
 		if (piece.value === 1 && move[1] === (isWhitePlaying ? 7 : 0)) // promote whenever possible
-			return { piece : piece, move : move };
+			return executeMove(piece, move[0], move[1]);
 		if (move.length === 4) // castle whenever possible
-			return { piece : piece, move : move };
+			return executeMove(piece, move[0], move[1]);
 		
 		var whitePiecesCopy = whitePieces;
 		var blackPiecesCopy = blackPieces;
@@ -313,8 +316,6 @@ var chooseBetweenAcceptableMoves = function(allMoves, isWhitePlaying)
 	}
 	
 	executeMove(chosenPiece, chosenMove[0], chosenMove[1]);
-	if (checkKingChecked(board, whitePieces, blackPieces))
-		console.info('King checked');
 	$('#thinkprogress').hide();
 	console.info('stop');
 }
