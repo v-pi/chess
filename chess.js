@@ -7,11 +7,12 @@ var initBoard = function() {
 	for (var ii = 7; ii >=0; ii--) {
 		var row = '<tr>';
 		for (var jj = 0; jj < 8; jj++) {
-			row += '<td ondrop="dropped(event, ' + jj + ', ' + ii + ')" ondragend="dragEnd(event)"></td>';
+			row += '<td ondrop="dropped(event, ' + jj + ', ' + ii + ')" ></td>';
 		}
 		row += '</td>'
 		$('#chessboard').append(row);
 	}
+	$('#chessboard').on('dragend', dragEnd);
 	
 	for (var ii = 0; ii < 8; ii++)
 	{
@@ -148,7 +149,23 @@ var play = function() {
 	console.log('start');
 	var result = think(!isPlayingWhite());
 	executeMove(result.piece, result.move[0], result.move[1]);
-	console.log('stop');
+	if (checkKingChecked(board, whitePieces, blackPieces))
+		console.info('King checked');
+	console.info('stop');
+}
+
+var checkKingChecked = function(board, whitePieces, blackPieces) {
+	var king = isPlayingWhite() ? whitePieces[0] : blackPieces[0];
+	var enemyPieces = isPlayingWhite() ? blackPieces : whitePieces;
+	for (var ii = 0; ii < enemyPieces.length; ii++) {
+		var moves = enemyPieces[ii].getMoves(board, whitePieces, blackPieces);
+		for (var jj = 0; jj < moves.length; jj++) {
+			if (moves[jj][0] === king.currentX && moves[jj][1] === king.currentY) {
+				return true;
+			}
+		}
+	}
+	return false;
 }
 
 var executeMove = function(piece, newX, newY) {
@@ -265,7 +282,7 @@ var think = function(isWhitePlaying) {
 			chosenMove = move;
 			chosenPiece = piece;
 			evaluation = tempEval;
-		}		
+		}
 		piece.currentX = oldX;
 		piece.currentY = oldY;
 	}
@@ -280,7 +297,7 @@ var thinkAsBlack = function(board, whitePieces, blackPieces, piece, move, depth,
 	var pawnWasPromoted = piece.value === 1 && move[1] === 7;
 	if (pawnWasPromoted) { // enemy pawn being promoted
 		if (depth === 0) return currentEval + 7;
-		piece.value = 8;
+		piece.value = 12;
 		piece.getMoves = Queen.prototype.getMoves;
 		currentEval += 7;
 	}
@@ -321,7 +338,7 @@ var thinkAsWhite = function(board, whitePieces, blackPieces, piece, move, depth,
 	var pawnWasPromoted = piece.value === 1 && move[1] === 0;
 	if (pawnWasPromoted) { // enemy pawn being promoted
 		if (depth === 0) return currentEval - 7;
-		piece.value = 8;
+		piece.value = 12;
 		piece.getMoves = Queen.prototype.getMoves;
 		currentEval -= 7;
 	}
@@ -355,6 +372,7 @@ var thinkAsWhite = function(board, whitePieces, blackPieces, piece, move, depth,
 	return evaluation;
 }
 
+/* For debug only */
 var logPieceMovement = function(piece, oldX, oldY, move) {
 	console.debug((piece.isWhite ? 'White ' : 'Black ') + piece._symbol + ' at ' + oldX + ', ' + oldY + ' moving to ' + move[0] + ', ' + move[1]);	
 }
@@ -371,12 +389,12 @@ $(document).ready(function() {
 });
 
 
-/*  
+/*
 
 FIXME
 
 Detect stalemate
-Force to save king when checked
+Detect checkmate
 
 TODO
 
@@ -394,7 +412,7 @@ Display pieces taken
 
 
 CANCELED
-	
+
 Do not decrement depth when a piece is taken (too complex)
 
 */
