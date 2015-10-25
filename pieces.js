@@ -178,7 +178,7 @@ var Rook = function(isWhite, isLeft) {
 	this.value = 6;
 	this.hasMoved = false; // keeping track of rook movement for castling
 }
-	
+
 Rook.prototype.getMoves = function(board, w, b) {
 	var moves = [];
 	for (var ii = this.currentX + 1; ii < 8; ii++) {
