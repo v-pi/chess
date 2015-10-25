@@ -146,12 +146,9 @@ var isPlayingWhite = function() {
 
 var play = function() {
 	$('#button').hide();
+	$('#thinkprogress').show();
 	console.log('start');
-	var result = think(!isPlayingWhite());
-	executeMove(result.piece, result.move[0], result.move[1]);
-	if (checkKingChecked(board, whitePieces, blackPieces))
-		console.info('King checked');
-	console.info('stop');
+	think(!isPlayingWhite());
 }
 
 var checkKingChecked = function(board, whitePieces, blackPieces) {
@@ -227,27 +224,55 @@ var executeMove = function(piece, newX, newY) {
 }
 
 var think = function(isWhitePlaying) {
-	var chosenPiece;
-	var chosenMove;
 	var evaluation = -1000;
 	var depth = getDepth();
 	var pieces = isWhitePlaying ? whitePieces : blackPieces;
-	var acceptableMoves = [];
 	var currentEval = simpleEvaluateBoard(whitePieces, blackPieces);
+	var allMoves = [];
+	
 	for (var ii = 0; ii < pieces.length; ii++) {
 		var moves = pieces[ii].getMoves(board, whitePieces, blackPieces);
 		for (var jj = 0; jj < moves.length; jj++) {
-			var move = moves[jj];
-			var tempEval = 0;
-			if (isWhitePlaying) tempEval = thinkAsBlack(board, whitePieces, blackPieces, pieces[ii], move, depth - 1, currentEval);
-			else tempEval = -1 * thinkAsWhite(board, whitePieces, blackPieces, pieces[ii], move, depth - 1, currentEval);
-			console.log(pieces[ii]._symbol + ' at ' + pieces[ii].currentX + ', ' + pieces[ii].currentY + ' moving to ' + move[0] + ', ' + move[1] + ' has a simple evaluation of ' + tempEval);
-			if (tempEval > evaluation) {
-				acceptableMoves = [{piece : pieces[ii], move : move }];
-				evaluation = tempEval;
-			} else if (tempEval == evaluation) {
-				acceptableMoves.push({piece : pieces[ii], move : move });
-			}
+			allMoves.push({ piece : pieces[ii], move : moves[jj] });
+		}
+	}
+	$('#thinkprogress').attr('max', allMoves.length);
+	$('#thinkprogress').val(0);
+	thinkAsync(allMoves, 0, isWhitePlaying, board, whitePieces, blackPieces, depth, currentEval);
+}
+
+var thinkAsync = function(allMoves, index, isWhitePlaying, board, whitePieces, blackPieces, depth, currentEval) {
+	var piece = allMoves[index].piece;
+	var move = allMoves[index].move;
+	var tempEval;
+	if (isWhitePlaying) tempEval = thinkAsBlack(board, whitePieces, blackPieces, allMoves[index].piece, move, depth - 1, currentEval);
+	else tempEval = -1 * thinkAsWhite(board, whitePieces, blackPieces, allMoves[index].piece, move, depth - 1, currentEval);
+	console.log(piece._symbol + ' at ' + piece.currentX + ', ' + piece.currentY + ' moving to ' + move[0] + ', ' + move[1] + ' has a simple evaluation of ' + tempEval);
+	allMoves[index].eval = tempEval;
+	
+	index++;
+	$('#thinkprogress').val(index);
+	if (index === allMoves.length) {
+		setTimeout(function() { chooseBetweenAcceptableMoves(allMoves, isWhitePlaying)}, 30);
+	} else {
+		setTimeout(function() { thinkAsync(allMoves, index, isWhitePlaying, board, whitePieces, blackPieces, depth, currentEval); }, 30);
+	}
+}
+	
+var chooseBetweenAcceptableMoves = function(allMoves, isWhitePlaying)
+{
+	var chosenPiece;
+	var chosenMove;
+	var maxEval;
+	var acceptableMoves = [];
+	var evaluation = -1000;
+	for (var ii = 0; ii < allMoves.length; ii++)
+	{
+		if (allMoves[ii].eval > evaluation) {
+			acceptableMoves = [{piece : allMoves[ii].piece, move : allMoves[ii].move }];
+			evaluation = allMoves[ii].eval;
+		} else if (allMoves[ii].eval == evaluation) {
+			acceptableMoves.push({piece : allMoves[ii].piece, move : allMoves[ii].move });
 		}
 	}
 	console.log('Acceptable moves : ' + acceptableMoves.length);
@@ -287,7 +312,11 @@ var think = function(isWhitePlaying) {
 		piece.currentY = oldY;
 	}
 	
-	return { piece : chosenPiece, move : chosenMove };
+	executeMove(chosenPiece, chosenMove[0], chosenMove[1]);
+	if (checkKingChecked(board, whitePieces, blackPieces))
+		console.info('King checked');
+	$('#thinkprogress').hide();
+	console.info('stop');
 }
 
 var thinkAsBlack = function(board, whitePieces, blackPieces, piece, move, depth, currentEval) {
@@ -381,6 +410,7 @@ var logPieceMovement = function(piece, oldX, oldY, move) {
 $(document).ready(function() {
 	$.event.props.push('dataTransfer');
 	initBoard();
+	$('#thinkprogress').hide();
 	$('#button').click(function() { play(); });
 	$('#depth').html(getDepth());
 	$('#depthinput').change(
@@ -400,8 +430,6 @@ TODO
 
 Forbid multiple turns
 Progressively increase depth as the number of pieces decreases
-Display estimated time
-Use setTimeout to avoid freeze
 Add debug : 
 	- move history
 	- evaluation history
@@ -409,6 +437,7 @@ Add debug :
 	- piece list with properties
 Show last move
 Display pieces taken
+Improve rating of trades when ahead, decrease when tied or behind
 
 
 CANCELED
